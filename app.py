@@ -9,6 +9,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import LabelEncoder
+import shap
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -94,7 +96,7 @@ st.divider()
 # ─────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📊 EDA", "🤖 Model & Evaluasi", "🔮 Prediksi Harga"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 EDA", "🤖 Model & Evaluasi", "🔮 Prediksi Harga", "🎯 SHAP Explainer"])
 
 # ══════════════════════════════════════════════
 # TAB 1 — EDA
@@ -306,3 +308,95 @@ with tab3:
         col_a.metric("Rata-rata pasar", f"Rp {avg/1e6:.2f}M")
         col_b.metric("Selisih dari rata-rata", f"Rp {abs(diff)/1e6:.2f}M",
                      delta=f"{pct:+.1f}%")
+
+# ══════════════════════════════════════════════
+# TAB 4 — SHAP EXPLAINER
+# ══════════════════════════════════════════════
+with tab4:
+    st.markdown('<div class="section-title">🎯 SHAP — Kenapa Model Prediksi Segitu?</div>', unsafe_allow_html=True)
+    st.caption("SHAP (SHapley Additive exPlanations) menjelaskan kontribusi tiap fitur terhadap hasil prediksi.")
+
+    @st.cache_resource
+    def get_shap_model():
+        X_full = df_processed.drop('price', axis=1)
+        y_full = df_processed['price']
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_full, y_full)
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_full)
+        return model, explainer, shap_values, X_full
+
+    with st.spinner("🔄 Menghitung SHAP values..."):
+        shap_model, explainer, shap_values, X_full = get_shap_model()
+
+    # 1. Global Feature Importance
+    st.markdown('<div class="section-title">1️⃣ Global — Fitur Paling Berpengaruh</div>', unsafe_allow_html=True)
+    mean_shap = np.abs(shap_values).mean(axis=0)
+    shap_df = pd.DataFrame({
+        'Feature': X_full.columns,
+        'Mean |SHAP|': mean_shap
+    }).sort_values('Mean |SHAP|', ascending=True)
+
+    fig_shap = px.bar(shap_df, x='Mean |SHAP|', y='Feature', orientation='h',
+                      color='Mean |SHAP|', color_continuous_scale='Viridis',
+                      title="Global Feature Importance (SHAP)")
+    fig_shap.update_layout(template='plotly_dark', showlegend=False)
+    st.plotly_chart(fig_shap, use_container_width=True)
+
+    top_feature = shap_df.iloc[-1]['Feature']
+    st.info(f"💡 **Insight:** Fitur **`{top_feature}`** paling besar pengaruhnya terhadap harga rumah!")
+
+    # 2. Individual Explanation
+    st.markdown('<div class="section-title">2️⃣ Individual — Penjelasan Prediksi per Rumah</div>', unsafe_allow_html=True)
+    sample_idx = st.slider("Pilih nomor rumah (index):", 0, len(df)-1, 0)
+    sample_row = X_full.iloc[[sample_idx]]
+    sample_shap = shap_values[sample_idx]
+    predicted = shap_model.predict(sample_row)[0]
+
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg,#1e2130,#2d3250);border-radius:12px;
+                padding:16px;margin-bottom:16px;border:1px solid #3d4570;">
+        <b>🏠 Rumah #{sample_idx}</b><br><br>
+        Area: <b>{df.iloc[sample_idx]['area']:,} sqft</b> &nbsp;|&nbsp;
+        Kamar: <b>{df.iloc[sample_idx]['bedrooms']}</b> &nbsp;|&nbsp;
+        AC: <b>{df.iloc[sample_idx]['airconditioning']}</b> &nbsp;|&nbsp;
+        Furnitur: <b>{df.iloc[sample_idx]['furnishingstatus']}</b><br><br>
+        💰 Harga Aktual: <b style="color:#f6c90e">Rp {df.iloc[sample_idx]['price']:,}</b> &nbsp;|&nbsp;
+        🤖 Prediksi: <b style="color:#7c83fd">Rp {predicted:,.0f}</b>
+    </div>
+    """, unsafe_allow_html=True)
+
+    contributions = sorted(zip(X_full.columns, sample_shap), key=lambda x: abs(x[1]))
+    features = [c[0] for c in contributions]
+    values = [c[1] for c in contributions]
+    colors = ['#2ecc71' if v > 0 else '#e74c3c' for v in values]
+
+    fig_waterfall = go.Figure(go.Bar(
+        x=values, y=features, orientation='h',
+        marker_color=colors,
+        text=[f"+Rp{v/1e6:.2f}M" if v > 0 else f"Rp{v/1e6:.2f}M" for v in values],
+        textposition='outside'
+    ))
+    fig_waterfall.update_layout(title=f"Kontribusi Fitur — Rumah #{sample_idx}",
+                                 template='plotly_dark', xaxis_title="SHAP Value (Rp)", height=450)
+    st.plotly_chart(fig_waterfall, use_container_width=True)
+
+    top_pos = max(zip(X_full.columns, sample_shap), key=lambda x: x[1])
+    top_neg = min(zip(X_full.columns, sample_shap), key=lambda x: x[1])
+    st.success(f"✅ **Pendorong harga naik:** `{top_pos[0]}` (+Rp {top_pos[1]/1e6:.2f}M)")
+    if top_neg[1] < 0:
+        st.error(f"⬇️ **Penekan harga:** `{top_neg[0]}` (Rp {top_neg[1]/1e6:.2f}M)")
+
+    # 3. Dependence Plot
+    st.markdown('<div class="section-title">3️⃣ Dependence Plot — Fitur vs SHAP Value</div>', unsafe_allow_html=True)
+    selected_feature = st.selectbox("Pilih fitur:", X_full.columns.tolist())
+    feat_idx = list(X_full.columns).index(selected_feature)
+
+    fig_dep = px.scatter(x=X_full[selected_feature], y=shap_values[:, feat_idx],
+                         color=shap_values[:, feat_idx], color_continuous_scale='RdBu',
+                         labels={'x': selected_feature, 'y': 'SHAP Value'},
+                         title=f"SHAP Dependence: {selected_feature}")
+    fig_dep.add_hline(y=0, line_dash='dash', line_color='white', opacity=0.4)
+    fig_dep.update_layout(template='plotly_dark')
+    st.plotly_chart(fig_dep, use_container_width=True)
+    st.caption("🟦 Biru = menurunkan harga | 🟥 Merah = menaikkan harga")
