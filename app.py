@@ -230,19 +230,19 @@ with tab4:
 
     col1,col2 = st.columns(2)
     with col1:
-        area = st.number_input("📐 Luas (sqft)", 500, 20000, 5000, 100)
-        bedrooms = st.slider("🛏️ Kamar Tidur", 1, 6, 3)
-        bathrooms = st.slider("🚿 Kamar Mandi", 1, 4, 2)
-        stories = st.slider("🏢 Lantai", 1, 4, 2)
-        parking = st.slider("🚗 Parkir", 0, 3, 1)
-        furnishing = st.selectbox("🛋️ Furnitur", ["furnished","semi-furnished","unfurnished"])
+        area = st.number_input("📐 Luas (sqft)", 500, 20000, 5000, 100, key="p_area")
+        bedrooms = st.slider("🛏️ Kamar Tidur", 1, 6, 3, key="p_bed")
+        bathrooms = st.slider("🚿 Kamar Mandi", 1, 4, 2, key="p_bath")
+        stories = st.slider("🏢 Lantai", 1, 4, 2, key="p_stor")
+        parking = st.slider("🚗 Parkir", 0, 3, 1, key="p_park")
+        furnishing = st.selectbox("🛋️ Furnitur", ["furnished","semi-furnished","unfurnished"], key="p_furn")
     with col2:
-        mainroad = st.radio("🛣️ Jalan Utama?", ["yes","no"], horizontal=True)
-        guestroom = st.radio("🛎️ Kamar Tamu?", ["yes","no"], horizontal=True)
-        basement = st.radio("🏚️ Basement?", ["yes","no"], horizontal=True)
-        hotwater = st.radio("🔥 Pemanas Air?", ["yes","no"], horizontal=True)
-        aircon = st.radio("❄️ AC?", ["yes","no"], horizontal=True)
-        prefarea = st.radio("⭐ Area Premium?", ["yes","no"], horizontal=True)
+        mainroad = st.radio("🛣️ Jalan Utama?", ["yes","no"], horizontal=True, key="p_road")
+        guestroom = st.radio("🛎️ Kamar Tamu?", ["yes","no"], horizontal=True, key="p_guest")
+        basement = st.radio("🏚️ Basement?", ["yes","no"], horizontal=True, key="p_base")
+        hotwater = st.radio("🔥 Pemanas Air?", ["yes","no"], horizontal=True, key="p_hot")
+        aircon = st.radio("❄️ AC?", ["yes","no"], horizontal=True, key="p_ac")
+        prefarea = st.radio("⭐ Area Premium?", ["yes","no"], horizontal=True, key="p_pref")
 
     st.divider()
     if st.button("🔮 Prediksi!", use_container_width=True, type="primary"):
@@ -349,15 +349,15 @@ with tab6:
 
     with col2:
         st.markdown("**✏️ Ubah fitur:**")
-        sim_area = st.slider("📐 Luas", 1650, 16200, int(df.iloc[bidx]['area']), 100)
-        sim_bed = st.slider("🛏️ Kamar Tidur", 1, 6, int(df.iloc[bidx]['bedrooms']))
-        sim_bath = st.slider("🚿 Kamar Mandi", 1, 4, int(df.iloc[bidx]['bathrooms']))
-        sim_stor = st.slider("🏢 Lantai", 1, 4, int(df.iloc[bidx]['stories']))
-        sim_park = st.slider("🚗 Parkir", 0, 3, int(df.iloc[bidx]['parking']))
-        sim_ac = st.radio("❄️ AC?", ["yes","no"], index=0 if df.iloc[bidx]['airconditioning']=='yes' else 1, horizontal=True)
-        sim_pref = st.radio("⭐ Premium?", ["yes","no"], index=0 if df.iloc[bidx]['prefarea']=='yes' else 1, horizontal=True)
+        sim_area = st.slider("📐 Luas", 1650, 16200, int(df.iloc[bidx]['area']), 100, key="s_area")
+        sim_bed = st.slider("🛏️ Kamar Tidur", 1, 6, int(df.iloc[bidx]['bedrooms']), key="s_bed")
+        sim_bath = st.slider("🚿 Kamar Mandi", 1, 4, int(df.iloc[bidx]['bathrooms']), key="s_bath")
+        sim_stor = st.slider("🏢 Lantai", 1, 4, int(df.iloc[bidx]['stories']), key="s_stor")
+        sim_park = st.slider("🚗 Parkir", 0, 3, int(df.iloc[bidx]['parking']), key="s_park")
+        sim_ac = st.radio("❄️ AC?", ["yes","no"], index=0 if df.iloc[bidx]['airconditioning']=='yes' else 1, horizontal=True, key="s_ac")
+        sim_pref = st.radio("⭐ Premium?", ["yes","no"], index=0 if df.iloc[bidx]['prefarea']=='yes' else 1, horizontal=True, key="s_pref")
         sim_furn = st.selectbox("🛋️ Furnitur", ["furnished","semi-furnished","unfurnished"],
-                                 index=['furnished','semi-furnished','unfurnished'].index(df.iloc[bidx]['furnishingstatus']))
+                                 index=['furnished','semi-furnished','unfurnished'].index(df.iloc[bidx]['furnishingstatus']), key="s_furn")
 
     sim_inp = base_row.copy()
     sim_inp['area']=sim_area; sim_inp['bedrooms']=sim_bed; sim_inp['bathrooms']=sim_bath
